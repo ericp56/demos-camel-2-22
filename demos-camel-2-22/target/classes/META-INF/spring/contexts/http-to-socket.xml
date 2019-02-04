@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+	http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+	<camelContext id="httptosocket"
+		xmlns="http://camel.apache.org/schema/spring">
+		<onException>
+			<exception>java.util.NoSuchElementException</exception>
+			<redeliveryPolicy maximumRedeliveries="5"
+				redeliveryDelay="1000" />
+		</onException>
+
+		<route id="mockUpstream">
+			<from
+				uri="netty4:tcp://localhost:8001?sync=true&amp;textline=true&amp;keepAlive=true&amp;disconnect=false&amp;reuseChannel=true" />
+			<log message="Incoming to upstream: ${body}" />
+			<transform>
+				<simple>${body}</simple>
+			</transform>
+		</route>
+		<route id="timerPing">
+			<from uri="timer:ping?period=10s" />
+			<to uri="netty4-http:http://0.0.0.0:8080/upstream/PING" />
+			<log message="PING 
+			Response: ${body}" />
+		</route>
+		<route id="httpServer">
+			<from
+				uri="netty4-http:http://0.0.0.0:8080/upstream?matchOnUriPrefix=true" />
+			<log
+				message="Incoming http command: ${in.headers[CamelHttpPath]}" />
+			<transform>
+				<simple>${in.headers[CamelHttpPath]}</simple>
+			</transform>
+			<to
+				uri="netty4:tcp://localhost:8001?workerGroup=#sharedPool&amp;sync=true&amp;textline=true&amp;keepAlive=true&amp;disconnect=false&amp;reuseChannel=true&amp;producerPoolMaxActive=1&amp;producerPoolMaxIdle=1" />
+			<transform>
+				<simple>${body}</simple>
+			</transform>
+		</route>
+
+	</camelContext>
+
+	<bean id="poolBuilder"
+		class="org.apache.camel.component.netty4.NettyWorkerPoolBuilder">
+		<property name="workerCount" value="1" />
+	</bean>
+
+	<bean id="sharedPool" class="io.netty.channel.EventLoopGroup"
+		factory-bean="poolBuilder" factory-method="build"
+		destroy-method="shutdown">
+	</bean>
+
+</beans>

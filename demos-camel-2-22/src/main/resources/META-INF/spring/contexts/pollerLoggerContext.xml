@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+	http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+	<camelContext id="pollerLoggerContext"
+		xmlns="http://camel.apache.org/schema/spring">
+		<onException>
+			<exception>java.lang.Exception</exception>
+			<handled>
+				<constant>true</constant>
+			</handled>
+			<log message="Polling google, exception"
+				loggingLevel="ERROR">
+			</log>
+		</onException>
+		<route id="timedPoller">
+			<from uri="timer:ping?period=10s" />
+			<to uri="https://www.google.com/?throwExceptionOnFailure=false" />
+			<choice>
+				<when>
+					<simple>${in.header.CamelHttpResponseCode} == '200'</simple>
+					<log message="Polling google succeeded" loggingLevel="INFO"></log>
+				</when>
+				<otherwise>
+					<log
+						message="Polling google, unexpected response code ${in.header.CamelHttpResponseCode}"
+						loggingLevel="ERROR">
+					</log>
+					<log message="response body ${in.body}" loggingLevel="DEBUG">
+					</log>
+				</otherwise>
+			</choice>
+		</route>
+
+	</camelContext>
+
+</beans>
